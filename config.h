@@ -10,6 +10,9 @@
 //Serial3 for teensy
 #define SERIALBMS  Serial3
 
+// victron serial VE direct bus config
+#define canSerial Serial2
+
 #define REG_DEV_STATUS      0
 #define REG_GPAI            1
 #define REG_VCELL1          3

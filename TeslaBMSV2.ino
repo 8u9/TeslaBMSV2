@@ -46,7 +46,7 @@ SerialConsole console;
 EEPROMSettings settings;
 
 /////Version Identifier/////////
-int firmver = 221310; //Year Month Day
+int firmver = 221212; //Year Month Day
 
 //Curent filter//
 float filterFrequency = 5.0 ;
@@ -102,6 +102,7 @@ byte bmsstatus = 0;
 #define Victron 5
 #define Coda 6
 #define VictronHV 7
+#define LeonardoProX 8
 //
 
 
@@ -346,7 +347,7 @@ void setup()
   SERIALCONSOLE.println("Starting up!");
   SERIALCONSOLE.println("SimpBMS V2 Tesla");
 
-  Serial2.begin(115200); //display and can adpater canbus
+  canSerial.begin(115200); //display and can adpater canbus
 
   // Display reason the Teensy was last reset
   Serial.println();
@@ -455,6 +456,12 @@ void loop()
   {
     menu();
   }
+  /*
+    if (settings.SerialCan == 1)
+    {
+    SerialCanRecieve();
+    }
+  */
   if (outputcheck != 1)
   {
     contcon();
@@ -963,7 +970,11 @@ void loop()
     }
     updateSOC();
     currentlimit();
-    VEcan();
+    if(settings.chargertype == LeonardoProX){
+      LeonardoProXCan();
+    }else{
+      VEcan(); 
+    }    
 
     if (settings.ESSmode == 1 && settings.ChargerDirect == 0 && CanOnRev == true)
     {
@@ -995,10 +1006,7 @@ void loop()
       }
     }
     alarmupdate();
-    if (CSVdebug != 1)
-    {
-      dashupdate();
-    }
+    dashupdate(); //Info on serial bus 2
     resetwdog();
   }
 
@@ -1025,52 +1033,143 @@ void loop()
   }
 }
 
-void alarmupdate()
-{
-  alarm[0] = 0x00;
-  if (settings.OverVSetpoint < bms.getHighCellVolt())
-  {
-    alarm[0] = 0x04;
+void allarmUpdateLeonardoProX(){
+
+  //Allarm Byte 0
+  alarm[0] = 0x00;  
+  if (settings.OverVSetpoint < bms.getHighCellVolt()){
+    // Bit 1
+    alarm[0] = 0x02;
   }
   if (bms.getLowCellVolt() < settings.UnderVSetpoint)
   {
-    alarm[0] |= 0x10;
+    // Bit 2
+    alarm[0] |= 0x04;
   }
   if (bms.getHighTemperature() > settings.OverTSetpoint)
+  { 
+    // Bit 3
+    alarm[0] |= 0x08;
+  }
+  if (bms.getLowTemperature() < settings.UnderTSetpoint)
   {
+    // Bit 4
+    alarm[0] |= 0x16;
+  }
+  if (abs(long(currentact / 100)) > discurrent){
+    //Bit 7
     alarm[0] |= 0x40;
   }
   alarm[1] = 0;
-  if (bms.getLowTemperature() < settings.UnderTSetpoint)
-  {
+  if(long(currentact / 100) > chargecurrent){
     alarm[1] = 0x01;
   }
-  alarm[3] = 0;
-  if ((bms.getHighCellVolt() - bms.getLowCellVolt()) > settings.CellGap)
-  {
-    alarm[3] = 0x01;
+  if(bmsstatus == Error){
+    alarm[1] |= 0x08;
   }
+  if(balancecells == 1){
+    alarm[1] |= 0x16;
+  }
+  
 
-  ///warnings///
+  //Warning
+  //Warning byte 0
   warning[0] = 0;
-
   if (bms.getHighCellVolt() > (settings.OverVSetpoint - settings.WarnOff))
   {
+    //Bit 1
     warning[0] = 0x04;
   }
   if (bms.getLowCellVolt() < (settings.UnderVSetpoint + settings.WarnOff))
   {
-    warning[0] |= 0x10;
+    //Bit 2
+    warning[0] |= 0x04;
   }
 
-  if (bms.getHighTemperature() > (settings.OverTSetpoint - settings.WarnToff))
-  {
+  if (bms.getHighTemperature() > (settings.OverTSetpoint - settings.WarnToff)){
+    //Bit 3
+    warning[0] |= 0x08;
+  }
+    
+  if (bms.getLowTemperature() < (settings.UnderTSetpoint + settings.WarnToff)){
+    //Bit 4
+    warning[0] |= 0x16;
+  }
+
+
+  
+  if (abs(long(currentact / 100)) > discurrent){
+    //Bit 7
     warning[0] |= 0x40;
   }
+  
   warning[1] = 0;
-  if (bms.getLowTemperature() < (settings.UnderTSetpoint + settings.WarnToff))
-  {
+  if(long(currentact / 100) > chargecurrent){
     warning[1] = 0x01;
+  }
+  if(bmsstatus == Error){
+    warning[1] |= 0x08;
+  }
+  if(balancecells == 1){
+    warning[1] |= 0x16;
+  }
+}
+
+
+void alarmupdate()
+{
+  if(settings.chargertype == LeonardoProX ){
+    allarmUpdateLeonardoProX();
+  }else{
+    alarm[0] = 0x00;
+    if (settings.OverVSetpoint < bms.getHighCellVolt())
+    {
+      alarm[0] = 0x04;
+    }
+    if (bms.getLowCellVolt() < settings.UnderVSetpoint)
+    {
+      alarm[0] |= 0x10;
+    }
+    if (bms.getHighTemperature() > settings.OverTSetpoint)
+    {
+      alarm[0] |= 0x40;
+    }
+    alarm[1] = 0;
+    if (bms.getLowTemperature() < settings.UnderTSetpoint)
+    {
+      alarm[1] = 0x01;
+    }
+    alarm[3] = 0;
+    if ((bms.getHighCellVolt() - bms.getLowCellVolt()) > settings.CellGap)
+    {
+      alarm[3] = 0x01;
+    }
+
+    ///warnings///
+    warning[0] = 0;
+
+    if (bms.getHighCellVolt() > (settings.OverVSetpoint - settings.WarnOff))
+    {
+      warning[0] = 0x04;
+    }
+    if (bms.getLowCellVolt() < (settings.UnderVSetpoint + settings.WarnOff))
+    {
+      warning[0] |= 0x10;
+    }
+
+    if (bms.getHighTemperature() > (settings.OverTSetpoint - settings.WarnToff))
+    {
+      warning[0] |= 0x40;
+    }
+    warning[1] = 0;
+    if (bms.getLowTemperature() < (settings.UnderTSetpoint + settings.WarnToff))
+    {
+      warning[1] = 0x01;
+    }
+    if (bms.getLowTemperature() < (settings.UnderTSetpoint + settings.WarnToff))
+    {
+      warning[1] = 0x01;
+    }
   }
 }
 
@@ -1916,6 +2015,170 @@ void VEcan() //communication with Victron system over CAN
 
 }
 
+void LeonardoProXCan(){
+  SERIALCONSOLE.println("Start Leonardo ProX Send Can Packets");
+  msg.id  = 0x351;
+  msg.len = 8;
+  if (storagemode == 0)
+  {
+    msg.buf[0] = lowByte(uint16_t((settings.ChargeVsetpoint * settings.Scells ) * 10));
+    msg.buf[1] = highByte(uint16_t((settings.ChargeVsetpoint * settings.Scells ) * 10));
+  }
+  else
+  {
+    msg.buf[0] = lowByte(uint16_t((settings.StoreVsetpoint * settings.Scells ) * 10));
+    msg.buf[1] = highByte(uint16_t((settings.StoreVsetpoint * settings.Scells ) * 10));
+  }
+  msg.buf[2] = lowByte(chargecurrent);
+  msg.buf[3] = highByte(chargecurrent);
+  msg.buf[4] = lowByte(discurrent);
+  msg.buf[5] = highByte(discurrent);
+  msg.buf[6] = lowByte(uint16_t((settings.DischVsetpoint * settings.Scells) * 10));
+  msg.buf[7] = highByte(uint16_t((settings.DischVsetpoint * settings.Scells) * 10));
+  Can0.write(msg);
+
+  msg.id  = 0x355;
+  msg.len = 8;
+  msg.buf[0] = lowByte(SOC);
+  msg.buf[1] = highByte(SOC);
+  msg.buf[2] = lowByte(SOH);
+  msg.buf[3] = highByte(SOH);
+  msg.buf[4] = lowByte(SOC * 10);
+  msg.buf[5] = highByte(SOC * 10);
+  msg.buf[6] = 0;
+  msg.buf[7] = 0;
+  Can0.write(msg);
+
+  msg.id  = 0x356;
+  msg.len = 8;
+
+  if (settings.chargertype == VictronHV || settings.SerialCan == 1)
+  {
+    msg.buf[0] = lowByte(uint16_t(bms.getPackVoltage() * 10));
+    msg.buf[1] = highByte(uint16_t(bms.getPackVoltage() * 10));
+  }
+  else
+  {
+    msg.buf[0] = lowByte(uint16_t(bms.getPackVoltage() * 100));
+    msg.buf[1] = highByte(uint16_t(bms.getPackVoltage() * 100));
+  }
+
+  msg.buf[2] = lowByte(long(currentact / 100));
+  msg.buf[3] = highByte(long(currentact / 100));
+  msg.buf[4] = lowByte(int16_t(bms.getAvgTemperature() * 10));
+  msg.buf[5] = highByte(int16_t(bms.getAvgTemperature() * 10));
+  msg.buf[6] = 0;
+  msg.buf[7] = 0;
+  Can0.write(msg);
+
+
+  delay(2);
+  msg.id  = 0x35A;
+  msg.len = 8;
+  msg.buf[0] = alarm[0];//High temp  Low Voltage | High Voltage
+  msg.buf[1] = alarm[1]; // High Discharge Current | Low Temperature
+  msg.buf[2] = alarm[2]; //Internal Failure | High Charge current
+  msg.buf[3] = alarm[3];// Cell Imbalance
+  msg.buf[4] = warning[0];//High temp  Low Voltage | High Voltage
+  msg.buf[5] = warning[1];// High Discharge Current | Low Temperature
+  msg.buf[6] = warning[2];//Internal Failure | High Charge current
+  msg.buf[7] = warning[3];// Cell Imbalance
+  Can0.write(msg);
+
+  delay(2);
+  msg.id  = 0x359;
+  msg.len = 8;
+  msg.buf[0] = alarm[0];
+  msg.buf[1] = alarm[1];
+  msg.buf[2] = warning[0];
+  msg.buf[3] = warning[1];
+  msg.buf[4] = 0;
+  msg.buf[5] = 0;
+  msg.buf[6] = 0;
+  msg.buf[7] = 0;
+  Can0.write(msg);
+  
+
+  msg.id  = 0x35E;
+  msg.len = 8;
+  msg.buf[0] = bmsname[0];
+  msg.buf[1] = bmsname[1];
+  msg.buf[2] = bmsname[2];
+  msg.buf[3] = bmsname[3];
+  msg.buf[4] = bmsname[4];
+  msg.buf[5] = bmsname[5];
+  msg.buf[6] = bmsname[6];
+  msg.buf[7] = bmsname[7];
+  Can0.write(msg);
+
+  delay(2);
+  msg.id  = 0x370;
+  msg.len = 8;
+  msg.buf[0] = bmsmanu[0];
+  msg.buf[1] = bmsmanu[1];
+  msg.buf[2] = bmsmanu[2];
+  msg.buf[3] = bmsmanu[3];
+  msg.buf[4] = bmsmanu[4];
+  msg.buf[5] = bmsmanu[5];
+  msg.buf[6] = bmsmanu[6];
+  msg.buf[7] = bmsmanu[7];
+  Can0.write(msg);
+
+  delay(2);
+  msg.id  = 0x373;
+  msg.len = 8;
+  msg.buf[0] = lowByte(uint16_t(bms.getLowCellVolt() * 1000));
+  msg.buf[1] = highByte(uint16_t(bms.getLowCellVolt() * 1000));
+  msg.buf[2] = lowByte(uint16_t(bms.getHighCellVolt() * 1000));
+  msg.buf[3] = highByte(uint16_t(bms.getHighCellVolt() * 1000));
+  msg.buf[4] = lowByte(uint16_t(bms.getLowTemperature() + 273.15));
+  msg.buf[5] = highByte(uint16_t(bms.getLowTemperature() + 273.15));
+  msg.buf[6] = lowByte(uint16_t(bms.getHighTemperature() + 273.15));
+  msg.buf[7] = highByte(uint16_t(bms.getHighTemperature() + 273.15));
+  Can0.write(msg);
+
+  delay(2);
+  msg.id  = 0x379; //Installed capacity
+  msg.len = 8;
+  msg.buf[0] = lowByte(uint16_t(settings.Pstrings * settings.CAP));
+  msg.buf[1] = highByte(uint16_t(settings.Pstrings * settings.CAP));
+  msg.buf[2] = contstat; //contactor state
+  msg.buf[3] = (digitalRead(OUT1) | (digitalRead(OUT2) << 1) | (digitalRead(OUT3) << 2) | (digitalRead(OUT4) << 3));
+  msg.buf[4] = bmsstatus;
+  msg.buf[5] = 0x00;
+  msg.buf[6] = 0x00;
+  msg.buf[7] = 0x00;
+  Can0.write(msg);
+  /*
+      delay(2);
+    msg.id  = 0x378; //Installed capacity
+    msg.len = 2;
+    //energy in 100wh/unit
+    msg.buf[0] =
+    msg.buf[1] =
+    msg.buf[2] =
+    msg.buf[3] =
+    //energy out 100wh/unit
+    msg.buf[4] =
+    msg.buf[5] =
+    msg.buf[6] =
+    msg.buf[7] =
+  */
+  delay(2);
+
+  msg.id  = 0x372;
+  msg.len = 8;
+  msg.buf[0] = lowByte(bms.getNumModules());
+  msg.buf[1] = highByte(bms.getNumModules());
+  msg.buf[2] = 0x00;
+  msg.buf[3] = 0x00;
+  msg.buf[4] = 0x00;
+  msg.buf[5] = 0x00;
+  msg.buf[6] = 0x00;
+  msg.buf[7] = 0x00;
+  Can0.write(msg);
+  SERIALCONSOLE.println("STOP Leonardo ProX Send Can Packets");
+}
 // Settings menu
 void menu()
 {
@@ -2318,7 +2581,7 @@ void menu()
 
       case '5': //1 Over Voltage Setpoint
         settings.chargertype = settings.chargertype + 1;
-        if (settings.chargertype > 7)
+        if (settings.chargertype > 8)
         {
           settings.chargertype = 0;
         }
@@ -2806,6 +3069,9 @@ void menu()
           case 7:
             SERIALCONSOLE.print("Victron HV Spec");
             break;
+          case 8:
+            SERIALCONSOLE.print("Leonardo Pro X");
+            break;
         }
         SERIALCONSOLE.println();
         if (settings.chargertype > 0)
@@ -2843,7 +3109,7 @@ void menu()
           SERIALCONSOLE.print(settings.chargerACv);
           SERIALCONSOLE.println("VAC");
         }
-
+       
         SERIALCONSOLE.print("d - Standard Can Voltage Scale: ");
         if (settings.SerialCan == 0)
         {
@@ -2853,7 +3119,7 @@ void menu()
         {
           SERIALCONSOLE.print("0.1");
         }
-        SERIALCONSOLE.println();
+         SERIALCONSOLE.println();
 
         SERIALCONSOLE.println("q - Go back to menu");
         menuload = 6;
@@ -3778,14 +4044,49 @@ void dashupdate()
   Serial2.write(0xff);  // We always have to send this three lines after each command sent to the nextion display.
   Serial2.write(0xff);
   Serial2.write(0xff);
-  Serial2.write(0xff);
   Serial2.print("cellbal.val=");
   Serial2.print(bms.getBalancing());
   Serial2.write(0xff);  // We always have to send this three lines after each command sent to the nextion display.
   Serial2.write(0xff);
   Serial2.write(0xff);
-}
 
+  ///Cell voltages///
+  Serial2.print("mNum.val=");
+  Serial2.print(1);
+  Serial2.write(0xff);  // We always have to send this three lines after each command sent to the nextion display.
+  Serial2.write(0xff);
+  Serial2.write(0xff);
+
+
+  for (int i=0; i < 6; i++)
+  {
+    Serial2.print("c");
+    Serial2.print(i + 1);
+    Serial2.print("id.val=");
+    Serial2.print(i + 1);
+    Serial2.write(0xff);  // We always have to send this three lines after each command sent to the nextion display.
+    Serial2.write(0xff);
+    Serial2.write(0xff);
+    Serial2.print("c");
+    Serial2.print(i + 1);
+    Serial2.print("v.val=");
+    Serial2.print(bms.getcellvolt(1, i));
+    Serial2.write(0xff);  // We always have to send this three lines after each command sent to the nextion display.
+    Serial2.write(0xff);
+    Serial2.write(0xff);
+  }
+
+  for (int i=0; i < 2; i++)
+  {
+    Serial2.print("t");
+    Serial2.print(i + 1);
+    Serial2.print("v.val=");
+    Serial2.print(bms.gettemp(1, i));
+    Serial2.write(0xff);  // We always have to send this three lines after each command sent to the nextion display.
+    Serial2.write(0xff);
+    Serial2.write(0xff);
+  }
+}
 
 void balancing()
 {
@@ -3959,6 +4260,21 @@ void chargercomms()
   }
 }
 
+/*void SerialCanRecieve()
+{
+  if (can.recv(&id, dta))
+  {
+    Serial.print("GET DATA FROM ID : ");
+    Serial.println(id, HEX);
+    for (int i = 0; i < 8; i++)
+    {
+      Serial.print("0x");
+      Serial.print(dta[i], HEX);
+      Serial.print('\t');
+    }
+    Serial.println();
+  }
+}*/
 
 void isrCP ()
 {
