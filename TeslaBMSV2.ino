@@ -78,6 +78,7 @@ byte bmsstatus = 0;
 #define Charge 3
 #define Precharge 4
 #define Error 5
+#define Warning 6
 //
 //Current sensor values
 #define Undefined 0
@@ -104,8 +105,6 @@ byte bmsstatus = 0;
 #define VictronHV 7
 #define LeonardoProX 8
 //
-
-
 
 int Discharge;
 
@@ -282,6 +281,9 @@ void loadSettings()
   settings.ExpMess = 0; //send alternate victron info
   settings.SerialCan = 0; //Serial canbus or display: 0-display 1- canbus expansion
   settings.tripcont = 1; //in ESSmode 1 - Main contactor function, 0 - Trip function
+  settings.WarnChargCurrOff = 5000; // mA from warning to Error Charging
+  settings.WarnDisChargCurrOff =  5000; // mA from warning to Error DisCharging
+  settings.WarnCellImbalaceOff = 30; // mV from warning to Error Cell imbalance
 }
 
 CAN_message_t msg;
@@ -2016,7 +2018,7 @@ void VEcan() //communication with Victron system over CAN
 }
 
 void LeonardoProXCan(){
-  SERIALCONSOLE.println("Start Leonardo ProX Send Can Packets");
+  Logger::info("Start Leonardo ProX Send Can Packets");
   msg.id  = 0x351;
   msg.len = 8;
   if (storagemode == 0)
@@ -2036,6 +2038,7 @@ void LeonardoProXCan(){
   msg.buf[6] = lowByte(uint16_t((settings.DischVsetpoint * settings.Scells) * 10));
   msg.buf[7] = highByte(uint16_t((settings.DischVsetpoint * settings.Scells) * 10));
   Can0.write(msg);
+  Logger::info("0x351 Sent");
 
   msg.id  = 0x355;
   msg.len = 8;
@@ -2048,6 +2051,7 @@ void LeonardoProXCan(){
   msg.buf[6] = 0;
   msg.buf[7] = 0;
   Can0.write(msg);
+  Logger::info("0x355 Sent");
 
   msg.id  = 0x356;
   msg.len = 8;
@@ -2070,7 +2074,7 @@ void LeonardoProXCan(){
   msg.buf[6] = 0;
   msg.buf[7] = 0;
   Can0.write(msg);
-
+  Logger::info("0x356 Sent");
 
   delay(2);
   msg.id  = 0x35A;
@@ -2084,6 +2088,7 @@ void LeonardoProXCan(){
   msg.buf[6] = warning[2];//Internal Failure | High Charge current
   msg.buf[7] = warning[3];// Cell Imbalance
   Can0.write(msg);
+  Logger::info("0x35A Sent");
 
   delay(2);
   msg.id  = 0x359;
@@ -2097,7 +2102,7 @@ void LeonardoProXCan(){
   msg.buf[6] = 0;
   msg.buf[7] = 0;
   Can0.write(msg);
-  
+  Logger::info("0x359 Sent");
 
   msg.id  = 0x35E;
   msg.len = 8;
@@ -2110,6 +2115,7 @@ void LeonardoProXCan(){
   msg.buf[6] = bmsname[6];
   msg.buf[7] = bmsname[7];
   Can0.write(msg);
+  Logger::info("0x35E Sent");
 
   delay(2);
   msg.id  = 0x370;
@@ -2123,6 +2129,7 @@ void LeonardoProXCan(){
   msg.buf[6] = bmsmanu[6];
   msg.buf[7] = bmsmanu[7];
   Can0.write(msg);
+  Logger::info("0x370 Sent");
 
   delay(2);
   msg.id  = 0x373;
@@ -2136,6 +2143,7 @@ void LeonardoProXCan(){
   msg.buf[6] = lowByte(uint16_t(bms.getHighTemperature() + 273.15));
   msg.buf[7] = highByte(uint16_t(bms.getHighTemperature() + 273.15));
   Can0.write(msg);
+  Logger::info("0x373 Sent");
 
   delay(2);
   msg.id  = 0x379; //Installed capacity
@@ -2149,6 +2157,7 @@ void LeonardoProXCan(){
   msg.buf[6] = 0x00;
   msg.buf[7] = 0x00;
   Can0.write(msg);
+  Logger::info("0x379 Sent");
   /*
       delay(2);
     msg.id  = 0x378; //Installed capacity
@@ -2177,7 +2186,8 @@ void LeonardoProXCan(){
   msg.buf[6] = 0x00;
   msg.buf[7] = 0x00;
   Can0.write(msg);
-  SERIALCONSOLE.println("STOP Leonardo ProX Send Can Packets");
+  Logger::info("0x372 Sent");
+  Logger::info("Stop Leonardo ProX Send Can Packets");
 }
 // Settings menu
 void menu()
@@ -3941,7 +3951,7 @@ void pwmcomms()
 }
 
 void dashupdate()
-{
+{  
   Serial2.write("stat.txt=");
   Serial2.write(0x22);
   if (settings.ESSmode == 1)
@@ -3950,9 +3960,15 @@ void dashupdate()
     {
       case (Boot):
         Serial2.print(" Active ");
+        DataToSend.Stat = "Active";
         break;
       case (Error):
         Serial2.print(" Error ");
+        DataToSend.Stat = "Error";
+        break;
+      default:
+        Serial2.print(" Ok ");
+        DataToSend.Stat = "Ok";
         break;
     }
   }
@@ -3962,26 +3978,32 @@ void dashupdate()
     {
       case (Boot):
         Serial2.print(" Boot ");
+        DataToSend.Stat = "Boot";
         break;
 
       case (Ready):
         Serial2.print(" Ready ");
+        DataToSend.Stat = "Ready";
         break;
 
       case (Precharge):
         Serial2.print(" Precharge ");
+        DataToSend.Stat = "Precharge";
         break;
 
       case (Drive):
         Serial2.print(" Drive ");
+        DataToSend.Stat = "Drive";
         break;
 
       case (Charge):
         Serial2.print(" Charge ");
+        DataToSend.Stat = "Charge";
         break;
 
       case (Error):
         Serial2.print(" Error ");
+        DataToSend.Stat = "Error";
         break;
     }
   }
@@ -3991,6 +4013,7 @@ void dashupdate()
   Serial2.write(0xff);
   Serial2.print("soc.val=");
   Serial2.print(SOC);
+  DataToSend.SOC = String(SOC);
   Serial2.write(0xff);  // We always have to send this three lines after each command sent to the nextion display.
   Serial2.write(0xff);
   Serial2.write(0xff);
@@ -4001,36 +4024,43 @@ void dashupdate()
   Serial2.write(0xff);
   Serial2.print("current.val=");
   Serial2.print(currentact / 100, 0);
+  DataToSend.CurrentAct = String(currentact);
   Serial2.write(0xff);  // We always have to send this three lines after each command sent to the nextion display.
   Serial2.write(0xff);
   Serial2.write(0xff);
   Serial2.print("temp.val=");
   Serial2.print(bms.getAvgTemperature(), 0);
+  DataToSend.TempAvg = String(bms.getAvgTemperature());
   Serial2.write(0xff);  // We always have to send this three lines after each command sent to the nextion display.
   Serial2.write(0xff);
   Serial2.write(0xff);
   Serial2.print("templow.val=");
   Serial2.print(bms.getLowTemperature(), 0);
+  DataToSend.TempLow = String(bms.getLowTemperature());
   Serial2.write(0xff);  // We always have to send this three lines after each command sent to the nextion display.
   Serial2.write(0xff);
   Serial2.write(0xff);
   Serial2.print("temphigh.val=");
   Serial2.print(bms.getHighTemperature(), 0);
+  DataToSend.TempHigh = String(bms.getHighTemperature());
   Serial2.write(0xff);  // We always have to send this three lines after each command sent to the nextion display.
   Serial2.write(0xff);
   Serial2.write(0xff);
   Serial2.print("volt.val=");
   Serial2.print(bms.getPackVoltage() * 10, 0);
+  DataToSend.VPac = String(bms.getPackVoltage()*10);
   Serial2.write(0xff);  // We always have to send this three lines after each command sent to the nextion display.
   Serial2.write(0xff);
   Serial2.write(0xff);
   Serial2.print("lowcell.val=");
   Serial2.print(bms.getLowCellVolt() * 1000, 0);
+  DataToSend.VlowCell = String(bms.getLowCellVolt()*1000);
   Serial2.write(0xff);  // We always have to send this three lines after each command sent to the nextion display.
   Serial2.write(0xff);
   Serial2.write(0xff);
   Serial2.print("highcell.val=");
   Serial2.print(bms.getHighCellVolt() * 1000, 0);
+  DataToSend.VhighCell = String(bms.getHighCellVolt()*1000);
   Serial2.write(0xff);  // We always have to send this three lines after each command sent to the nextion display.
   Serial2.write(0xff);
   Serial2.write(0xff);
@@ -4041,11 +4071,13 @@ void dashupdate()
   Serial2.write(0xff);
   Serial2.print("celldelta.val=");
   Serial2.print((bms.getHighCellVolt() - bms.getLowCellVolt()) * 1000, 0);
+  DataToSend.Celldelta = String((bms.getHighCellVolt() - bms.getLowCellVolt()) * 1000);
   Serial2.write(0xff);  // We always have to send this three lines after each command sent to the nextion display.
   Serial2.write(0xff);
   Serial2.write(0xff);
   Serial2.print("cellbal.val=");
   Serial2.print(bms.getBalancing());
+  DataToSend.Cellbal = String(bms.getBalancing());
   Serial2.write(0xff);  // We always have to send this three lines after each command sent to the nextion display.
   Serial2.write(0xff);
   Serial2.write(0xff);

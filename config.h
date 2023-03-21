@@ -104,4 +104,22 @@ typedef struct {
   uint8_t tripcont;
   int chargereff;
   int chargerACv;
+  float WarnChargCurrOff;
+  float WarnDisChargCurrOff;
+  float WarnCellImbalaceOff;
 } EEPROMSettings;
+
+
+struct SerialOutData{
+  char Stat[60];
+  char SOC[60];
+  char CurrentAct[60];
+  char TempAvg[60];
+  char TempLow[60];
+  char TempHigh[60];
+  char VlowCell[60];
+  char VhighCell[60];
+  char VPac[60];
+  char Celldelta[60];
+  char Cellbal[60];
+};
