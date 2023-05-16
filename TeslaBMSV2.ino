@@ -3960,15 +3960,15 @@ void dashupdate()
     {
       case (Boot):
         Serial2.print(" Active ");
-        DataToSend.Stat = "Active";
+        //DataToSend.Stat = "Active";
         break;
       case (Error):
         Serial2.print(" Error ");
-        DataToSend.Stat = "Error";
+        //DataToSend.Stat = "Error";
         break;
       default:
         Serial2.print(" Ok ");
-        DataToSend.Stat = "Ok";
+        //DataToSend.Stat = "Ok";
         break;
     }
   }
@@ -3978,32 +3978,32 @@ void dashupdate()
     {
       case (Boot):
         Serial2.print(" Boot ");
-        DataToSend.Stat = "Boot";
+        //DataToSend.Stat = "Boot";
         break;
 
       case (Ready):
         Serial2.print(" Ready ");
-        DataToSend.Stat = "Ready";
+        //DataToSend.Stat = "Ready";
         break;
 
       case (Precharge):
         Serial2.print(" Precharge ");
-        DataToSend.Stat = "Precharge";
+        //DataToSend.Stat = "Precharge";
         break;
 
       case (Drive):
         Serial2.print(" Drive ");
-        DataToSend.Stat = "Drive";
+        //DataToSend.Stat = "Drive";
         break;
 
       case (Charge):
         Serial2.print(" Charge ");
-        DataToSend.Stat = "Charge";
+        //DataToSend.Stat = "Charge";
         break;
 
       case (Error):
         Serial2.print(" Error ");
-        DataToSend.Stat = "Error";
+        //DataToSend.Stat = "Error";
         break;
     }
   }
@@ -4013,7 +4013,7 @@ void dashupdate()
   Serial2.write(0xff);
   Serial2.print("soc.val=");
   Serial2.print(SOC);
-  DataToSend.SOC = String(SOC);
+  //DataToSend.SOC = String(SOC);
   Serial2.write(0xff);  // We always have to send this three lines after each command sent to the nextion display.
   Serial2.write(0xff);
   Serial2.write(0xff);
@@ -4024,43 +4024,43 @@ void dashupdate()
   Serial2.write(0xff);
   Serial2.print("current.val=");
   Serial2.print(currentact / 100, 0);
-  DataToSend.CurrentAct = String(currentact);
+  //DataToSend.CurrentAct = String(currentact);
   Serial2.write(0xff);  // We always have to send this three lines after each command sent to the nextion display.
   Serial2.write(0xff);
   Serial2.write(0xff);
   Serial2.print("temp.val=");
   Serial2.print(bms.getAvgTemperature(), 0);
-  DataToSend.TempAvg = String(bms.getAvgTemperature());
+  //DataToSend.TempAvg = String(bms.getAvgTemperature());
   Serial2.write(0xff);  // We always have to send this three lines after each command sent to the nextion display.
   Serial2.write(0xff);
   Serial2.write(0xff);
   Serial2.print("templow.val=");
   Serial2.print(bms.getLowTemperature(), 0);
-  DataToSend.TempLow = String(bms.getLowTemperature());
+  //DataToSend.TempLow = String(bms.getLowTemperature());
   Serial2.write(0xff);  // We always have to send this three lines after each command sent to the nextion display.
   Serial2.write(0xff);
   Serial2.write(0xff);
   Serial2.print("temphigh.val=");
   Serial2.print(bms.getHighTemperature(), 0);
-  DataToSend.TempHigh = String(bms.getHighTemperature());
+  //DataToSend.TempHigh = String(bms.getHighTemperature());
   Serial2.write(0xff);  // We always have to send this three lines after each command sent to the nextion display.
   Serial2.write(0xff);
   Serial2.write(0xff);
   Serial2.print("volt.val=");
   Serial2.print(bms.getPackVoltage() * 10, 0);
-  DataToSend.VPac = String(bms.getPackVoltage()*10);
+  //DataToSend.VPac = String(bms.getPackVoltage()*10);
   Serial2.write(0xff);  // We always have to send this three lines after each command sent to the nextion display.
   Serial2.write(0xff);
   Serial2.write(0xff);
   Serial2.print("lowcell.val=");
   Serial2.print(bms.getLowCellVolt() * 1000, 0);
-  DataToSend.VlowCell = String(bms.getLowCellVolt()*1000);
+  //DataToSend.VlowCell = String(bms.getLowCellVolt()*1000);
   Serial2.write(0xff);  // We always have to send this three lines after each command sent to the nextion display.
   Serial2.write(0xff);
   Serial2.write(0xff);
   Serial2.print("highcell.val=");
   Serial2.print(bms.getHighCellVolt() * 1000, 0);
-  DataToSend.VhighCell = String(bms.getHighCellVolt()*1000);
+  //DataToSend.VhighCell = String(bms.getHighCellVolt()*1000);
   Serial2.write(0xff);  // We always have to send this three lines after each command sent to the nextion display.
   Serial2.write(0xff);
   Serial2.write(0xff);
@@ -4071,13 +4071,13 @@ void dashupdate()
   Serial2.write(0xff);
   Serial2.print("celldelta.val=");
   Serial2.print((bms.getHighCellVolt() - bms.getLowCellVolt()) * 1000, 0);
-  DataToSend.Celldelta = String((bms.getHighCellVolt() - bms.getLowCellVolt()) * 1000);
+  //DataToSend.Celldelta = String((bms.getHighCellVolt() - bms.getLowCellVolt()) * 1000);
   Serial2.write(0xff);  // We always have to send this three lines after each command sent to the nextion display.
   Serial2.write(0xff);
   Serial2.write(0xff);
   Serial2.print("cellbal.val=");
   Serial2.print(bms.getBalancing());
-  DataToSend.Cellbal = String(bms.getBalancing());
+  //DataToSend.Cellbal = String(bms.getBalancing());
   Serial2.write(0xff);  // We always have to send this three lines after each command sent to the nextion display.
   Serial2.write(0xff);
   Serial2.write(0xff);
